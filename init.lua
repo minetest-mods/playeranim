@@ -1,4 +1,22 @@
-local model = minetest.get_modpath("3d_armor") and "armor" or "normal"
+-- Version of player model.
+-- default_character_v1:
+--	minetest_game before 25 nov 2016
+--	3d_armor before 27 nov 2016	(overrides model from minetest_game)
+-- default_character_v2:
+--	minetest_game after 25 nov 2016
+--	3d_armor after 27 nov 2016	(overrides model from minetest_game)
+
+local valid_player_model_versions =  {
+	default_character_v1 = true,
+	default_character_v2 = true,
+}
+
+local player_model_version = minetest.setting_get("player_model_version")
+if not player_model_version or player_model_version == "" then
+	player_model_version = "default_character_v2"
+elseif not  valid_player_model_versions[player_model_version] then
+	error("Invalid value for player_model_version in minetest.conf: " .. player_model_version)
+end
 
 -- Localize to avoid table lookups
 local vector_new = vector.new
@@ -25,49 +43,52 @@ local LLEG = "Leg_Left"
 local RLEG = "Leg_Right"
 
 local bone_positions = {
-	normal = {
+	default_character_v1 = {
 		[BODY] = vector_new(0, -3.5, 0),
-		[HEAD] = vector_new(0, 6.5, 0),
-		[CAPE] = vector_new(0, 6.5, 1.5),
-		[LARM] = vector_new(-3.9, 6.5, 0),
-		[RARM] = vector_new(3.9, 6.5, 0),
+		[HEAD] = vector_new(0, 6.75, 0),
+		[CAPE] = vector_new(0, 6.75, 1.1),
+		[LARM] = vector_new(2, 6.75, 0),
+		[RARM] = vector_new(-2, 6.75, 0),
 		[LLEG] = vector_new(-1, 0, 0),
 		[RLEG] = vector_new(1, 0, 0)
 	},
-	armor = {
+	default_character_v2 = {
 		[BODY] = vector_new(0, -3.5, 0),
 		[HEAD] = vector_new(0, 6.75, 0),
-		[CAPE] = vector_new(0, 6.75, 1.5),
-		[LARM] = vector_new(2, 6.5, 0),
-		[RARM] = vector_new(-2, 6.5, 0),
+		[CAPE] = vector_new(0, 6.75, 1.2),
+		[LARM] = vector_new(3, 5.75, 0),
+		[RARM] = vector_new(-3, 5.75, 0),
 		[LLEG] = vector_new(1, 0, 0),
 		[RLEG] = vector_new(-1, 0, 0)
 	}
 }
 
 local bone_rotations = {
-	normal = {
+	default_character_v1 = {
 		[BODY] = vector_new(0, 0, 0),
 		[HEAD] = vector_new(0, 0, 0),
-		[CAPE] = vector_new(0, 0, 180),
-		[LARM] = vector_new(180, 0, 7.5),
-		[RARM] = vector_new(180, 0, -7.5),
+		[CAPE] = vector_new(180, 0, 0),
+		[LARM] = vector_new(180, 0, 9),
+		[RARM] = vector_new(180, 0, -9),
 		[LLEG] = vector_new(0, 0, 0),
 		[RLEG] = vector_new(0, 0, 0)
 	},
-	armor = {
+	default_character_v2 = {
 		[BODY] = vector_new(0, 0, 0),
 		[HEAD] = vector_new(0, 0, 0),
-		[CAPE] = vector_new(180, 0, 180),
-		[LARM] = vector_new(180, 0, 9),
-		[RARM] = vector_new(180, 0, -9),
+		[CAPE] = vector_new(0, 0, 0),
+		[LARM] = vector_new(0, 0, 0),
+		[RARM] = vector_new(0, 0, 0),
 		[LLEG] = vector_new(0, 0, 0),
 		[RLEG] = vector_new(0, 0, 0)
 	}
 }
 
-local bone_rotation = bone_rotations[model]
-local bone_position = bone_positions[model]
+local bone_rotation = bone_rotations[player_model_version]
+local bone_position = bone_positions[player_model_version]
+if not bone_rotation or not bone_position then
+	error("Internal error: invalid player_model_version: " .. player_model_version)
+end
 
 local bone_rotation_cache = {}
 
@@ -109,7 +130,7 @@ local animations = {
 	[WALK] = function(player)
 		local swing = math_sin(step * 4 * animation_speed[player])
 
-		rotate(player, CAPE, swing * 30 + 35)
+		rotate(player, CAPE, swing * -30 - 35)
 		rotate(player, LARM, swing * -40)
 		rotate(player, RARM, swing * 40)
 		rotate(player, LLEG, swing * 40)
@@ -123,9 +144,9 @@ local animations = {
 		local swing = math_sin(step * 4 * speed)
 		local hand_swing = math_sin(step * 8 * speed)
 
-		rotate(player, CAPE, swing * 5 + 10)
+		rotate(player, CAPE, swing * -5 - 10)
 		rotate(player, LARM)
-		rotate(player, RARM, hand_swing * 20 + 80 + pitch)
+		rotate(player, RARM, hand_swing * 20 + 80 + pitch, hand_swing * 5 - 3, 10)
 		rotate(player, LLEG)
 		rotate(player, RLEG)
 	end,
@@ -137,9 +158,9 @@ local animations = {
 		local swing = math_sin(step * 4 * speed)
 		local hand_swing = math_sin(step * 8 * speed)
 
-		rotate(player, CAPE, swing * 30 + 35)
+		rotate(player, CAPE, swing * -30 - 35)
 		rotate(player, LARM, swing * -40)
-		rotate(player, RARM, hand_swing * 20 + 80 + pitch)
+		rotate(player, RARM, hand_swing * 20 + 80 + pitch, hand_swing * 5 - 3, 10)
 		rotate(player, LLEG, swing * 40)
 		rotate(player, RLEG, swing * -40)
 	end,
