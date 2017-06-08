@@ -11,7 +11,7 @@ local valid_player_model_versions =  {
 	default_character_v2 = true,
 }
 
-local player_model_version = minetest.setting_get("player_model_version")
+local player_model_version = minetest.settings:get("player_model_version")
 if not player_model_version or player_model_version == "" then
 	player_model_version = "default_character_v2"
 elseif not  valid_player_model_versions[player_model_version] then
