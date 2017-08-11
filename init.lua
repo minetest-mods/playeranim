@@ -9,6 +9,7 @@
 local valid_player_model_versions =  {
 	default_character_v1 = true,
 	default_character_v2 = true,
+	default_character_v3 = true,
 }
 
 local player_model_version = minetest.settings:get("player_model_version")
@@ -60,6 +61,15 @@ local bone_positions = {
 		[RARM] = vector_new(-3, 5.75, 0),
 		[LLEG] = vector_new(1, 0, 0),
 		[RLEG] = vector_new(-1, 0, 0)
+	},
+	default_character_v3 = {
+		[BODY] = vector_new(0, 6.75, 0),
+		[HEAD] = vector_new(0, 6.75, 0),
+		[CAPE] = vector_new(0, 6.75, 1.2),
+		[LARM] = vector_new(3, 5.75, 0),
+		[RARM] = vector_new(-3, 5.75, 0),
+		[LLEG] = vector_new(1, 0, 0),
+		[RLEG] = vector_new(-1, 0, 0)
 	}
 }
 
@@ -74,6 +84,15 @@ local bone_rotations = {
 		[RLEG] = vector_new(0, 0, 0)
 	},
 	default_character_v2 = {
+		[BODY] = vector_new(0, 0, 0),
+		[HEAD] = vector_new(0, 0, 0),
+		[CAPE] = vector_new(0, 0, 0),
+		[LARM] = vector_new(0, 0, 0),
+		[RARM] = vector_new(0, 0, 0),
+		[LLEG] = vector_new(0, 0, 0),
+		[RLEG] = vector_new(0, 0, 0)
+	},
+	default_character_v3 = {
 		[BODY] = vector_new(0, 0, 0),
 		[HEAD] = vector_new(0, 0, 0),
 		[CAPE] = vector_new(0, 0, 0),
