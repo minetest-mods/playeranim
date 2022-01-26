@@ -9,25 +9,29 @@ local RLEG = "Leg_Right"
 
 local BONE_POSITIONS = {
 	MTG_0_4_x = {
-		[BODY] = {x = 0,   y = -3.5, z = 0},
-		[HEAD] = {x = 0,   y = 6.5,  z = 0},
-		[CAPE] = {x = 0,   y = 6.5,  z = 1.2},
-		[LARM] = {x = 3,   y = 5.5,  z = 0},
-		[RARM] = {x = -3,  y = 5.5,  z = 0},
-		[LLEG] = {x = 1,   y = 0,    z = 0},
-		[RLEG] = {x = -1,  y = 0,    z = 0},
+		default = {
+			[BODY] = {x = 0,   y = -3.5, z = 0},
+			[HEAD] = {x = 0,   y = 6.5,  z = 0},
+			[CAPE] = {x = 0,   y = 6.5,  z = 1.2},
+			[LARM] = {x = 3,   y = 5.5,  z = 0},
+			[RARM] = {x = -3,  y = 5.5,  z = 0},
+			[LLEG] = {x = 1,   y = 0,    z = 0},
+			[RLEG] = {x = -1,  y = 0,    z = 0},
+		},
 
 		body_sit = {x = 0, y = -5.5, z = 0},
 		body_lay = {x = 0, y = -5.5, z = 0},
 	},
 	MTG_5_0_x = {
-		[BODY] = {x = 0,   y = 6.25, z = 0},
-		[HEAD] = {x = 0,   y = 6.5,  z = 0},
-		[CAPE] = {x = 0,   y = 6.5,  z = 1.2},
-		[LARM] = {x = 3,   y = 5.5,  z = 0},
-		[RARM] = {x = -3,  y = 5.5,  z = 0},
-		[LLEG] = {x = 1,   y = 0,    z = 0},
-		[RLEG] = {x = -1,  y = 0,    z = 0},
+		default = {
+			[BODY] = {x = 0,   y = 6.25, z = 0},
+			[HEAD] = {x = 0,   y = 6.5,  z = 0},
+			[CAPE] = {x = 0,   y = 6.5,  z = 1.2},
+			[LARM] = {x = 3,   y = 5.5,  z = 0},
+			[RARM] = {x = -3,  y = 5.5,  z = 0},
+			[LLEG] = {x = 1,   y = 0,    z = 0},
+			[RLEG] = {x = -1,  y = 0,    z = 0},
+		},
 
 		body_sit = {x = 0, y = -5, z = 0},
 		body_lay = {x = 0, y = -5, z = 0},
@@ -36,25 +40,29 @@ local BONE_POSITIONS = {
 
 local BONE_ROTATIONS = {
 	MTG_0_4_x = {
-		[BODY] = {x = 0, y = 0, z = 0},
-		[HEAD] = {x = 0, y = 0, z = 0},
-		[CAPE] = {x = 0, y = 0, z = 0},
-		[LARM] = {x = 0, y = 0, z = 0},
-		[RARM] = {x = 0, y = 0, z = 0},
-		[LLEG] = {x = 0, y = 0, z = 0},
-		[RLEG] = {x = 0, y = 0, z = 0},
+		default = {
+			[BODY] = {x = 0, y = 0, z = 0},
+			[HEAD] = {x = 0, y = 0, z = 0},
+			[CAPE] = {x = 0, y = 0, z = 0},
+			[LARM] = {x = 0, y = 0, z = 0},
+			[RARM] = {x = 0, y = 0, z = 0},
+			[LLEG] = {x = 0, y = 0, z = 0},
+			[RLEG] = {x = 0, y = 0, z = 0},
+		},
 
 		body_sit = {x = 0,   y = 0, z = 0},
 		body_lay = {x = 270, y = 0, z = 0},
 	},
 	MTG_5_0_x = {
-		[BODY] = {x = 0, y = 0, z = 0},
-		[HEAD] = {x = 0, y = 0, z = 0},
-		[CAPE] = {x = 0, y = 0, z = 0},
-		[LARM] = {x = 0, y = 0, z = 0},
-		[RARM] = {x = 0, y = 0, z = 0},
-		[LLEG] = {x = 0, y = 0, z = 0},
-		[RLEG] = {x = 0, y = 0, z = 0},
+		default = {
+			[BODY] = {x = 0, y = 0, z = 0},
+			[HEAD] = {x = 0, y = 0, z = 0},
+			[CAPE] = {x = 0, y = 0, z = 0},
+			[LARM] = {x = 0, y = 0, z = 0},
+			[RARM] = {x = 0, y = 0, z = 0},
+			[LLEG] = {x = 0, y = 0, z = 0},
+			[RLEG] = {x = 0, y = 0, z = 0},
+		},
 
 		body_sit = {x = 0,   y = 0, z = 0},
 		body_lay = {x = 270, y = 0, z = 0},
