@@ -9,7 +9,7 @@ local ANIMATION_SPEED = tonumber(minetest.settings:get("playeranim.animation_spe
 local ANIMATION_SPEED_SNEAK = tonumber(minetest.settings:get("playeranim.animation_speed_sneak")) or 0.8
 local BODY_ROTATION_DELAY = math.max(math.floor(tonumber(minetest.settings:get("playeranim.body_rotation_delay")) or 7), 1)
 local BODY_X_ROTATION_SNEAK = tonumber(minetest.settings:get("playeranim.body_x_rotation_sneak")) or 6.0
-local ROTATE_ON_SNEAK = true
+local ROTATE_ON_SNEAK = minetest.settings:get_bool("playeranim.rotation_sneak", true)
 
 local BONE_POSITION, BONE_ROTATION = (function()
 	local modname = minetest.get_current_modname()
