@@ -9,3 +9,6 @@ playeranim.animation_speed (The speed of an animation) float 2.4
 
 #    The number of stepping per seconds in sneaking.
 playeranim.animation_speed_sneak (The speed of an animation in sneaking) float 0.8
+
+#    Should the body be rotated on sneak
+playeranim.rotation_sneak (Rotate the body on sneak) bool true

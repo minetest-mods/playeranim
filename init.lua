@@ -3,16 +3,23 @@ if not minetest.settings then
 	error("Mod playeranim requires Minetest 0.4.16 or newer")
 end
 
+playeranim = {}
+
 local ANIMATION_SPEED = tonumber(minetest.settings:get("playeranim.animation_speed")) or 2.4
 local ANIMATION_SPEED_SNEAK = tonumber(minetest.settings:get("playeranim.animation_speed_sneak")) or 0.8
 local BODY_ROTATION_DELAY = math.max(math.floor(tonumber(minetest.settings:get("playeranim.body_rotation_delay")) or 7), 1)
 local BODY_X_ROTATION_SNEAK = tonumber(minetest.settings:get("playeranim.body_x_rotation_sneak")) or 6.0
+local ROTATE_ON_SNEAK = minetest.settings:get_bool("playeranim.rotation_sneak", true)
 
 local BONE_POSITION, BONE_ROTATION = (function()
 	local modname = minetest.get_current_modname()
 	local modpath = minetest.get_modpath(modname)
 	return dofile(modpath .. "/model.lua")
 end)()
+
+local vector_add, vector_equals = vector.add, vector.equals
+local math_sin, math_cos, math_pi, math_deg = math.sin, math.cos, math.pi, math.deg
+local table_remove = table.remove
 
 local get_animation = minetest.global_exists("player_api")
 	and player_api.get_animation or default.player_get_animation
@@ -38,14 +45,6 @@ if minetest.global_exists("player_api") then
 	end)
 end
 
-local function get_animation_speed(player)
-	if player:get_player_control().sneak then
-		return ANIMATION_SPEED_SNEAK
-	end
-	return ANIMATION_SPEED
-end
-
-local math_deg = math.deg
 local function get_pitch_deg(player)
 	return math_deg(player:get_look_vertical())
 end
@@ -58,7 +57,11 @@ local players_animation_data = setmetatable({}, {
 				yaw_history = {},
 				bone_rotations = {},
 				bone_positions = {},
-				previous_animation = 0,
+				static_rotations = {},
+				static_positions = {},
+				previous_animations = {},
+				assigned_animations = {},
+				animation_speed = nil
 			}
 		end,
 
@@ -110,13 +113,52 @@ local players_animation_data = setmetatable({}, {
 			self[player].bone_positions[bone] = position
 		end,
 
-		-- previous_animation
-		get_previous_animation = function(self, player)
-			return self[player].previous_animation
+		-- static_rotations
+		get_static_rotations = function(self, player)
+			return self[player].static_rotations
 		end,
 
-		set_previous_animation = function(self, player, animation)
-			self[player].previous_animation = animation
+		set_static_rotations = function(self, player, rotations)
+			self[player].static_rotations = rotations
+		end,
+
+		-- static_positions
+		get_static_positions = function(self, player)
+			return self[player].static_positions
+		end,
+
+		set_static_positions = function(self, player, positions)
+			self[player].static_positions = positions
+		end,
+
+		-- previous_animations
+		get_previous_animations = function(self, player)
+			return self[player].previous_animations
+		end,
+
+		set_previous_animations = function(self, player, animations)
+			self[player].previous_animations = animations
+		end,
+
+		-- assigned_animations
+		get_assigned_animations = function(self, player)
+			return self[player].assigned_animations
+		end,
+
+		assign_animation = function(self, player, animation)
+			self[player].assigned_animations[animation] = true
+		end,
+
+		unassign_animation = function(self, player, animation)
+			self[player].assigned_animations[animation] = nil
+		end,
+
+		-- animation_speed
+		get_animation_speed = function(self, player)
+			return self[player].animation_speed
+		end,
+		set_animation_speed = function(self, player, speed)
+			self[player].animation_speed = speed
 		end,
 	}
 })
@@ -125,34 +167,20 @@ minetest.register_on_joinplayer(function(player)
 	players_animation_data:init_player(player)
 end)
 
-local vector_add, vector_equals = vector.add, vector.equals
-local function rotate_bone(player, bone, rotation, position_optional)
+local function rotate_bone(player, bone, rotation, position)
 	local previous_rotation = players_animation_data:get_bone_rotation(player, bone)
-	local rotation = vector_add(rotation, BONE_ROTATION[bone])
-
 	local previous_position = players_animation_data:get_bone_position(player, bone)
-	local position = BONE_POSITION[bone]
-	if position_optional then
-		position = vector_add(position, position_optional)
-	end
 
 	if not previous_rotation
 	or not previous_position
 	or not vector_equals(rotation, previous_rotation)
-	or not vector_equals(position, previous_position) then
+	or not vector_equals(position, previous_position)
+	then
 		player:set_bone_position(bone, position, rotation)
 		players_animation_data:set_bone_rotation(player, bone, rotation)
 		players_animation_data:set_bone_position(player, bone, position)
 	end
 end
-
--- Animation alias
-local STAND = 1
-local WALK = 2
-local MINE = 3
-local WALK_MINE = 4
-local SIT = 5
-local LAY = 6
 
 -- Bone alias
 local BODY = "Body"
@@ -163,97 +191,114 @@ local RARM = "Arm_Right"
 local LLEG = "Leg_Left"
 local RLEG = "Leg_Right"
 
-local math_sin, math_cos, math_pi = math.sin, math.cos, math.pi
-local ANIMATIONS = {
-	[STAND] = function(player, _time)
-		rotate_bone(player, BODY, {x = 0, y = 0, z = 0})
-		rotate_bone(player, CAPE, {x = 0, y = 0, z = 0})
-		rotate_bone(player, LARM, {x = 0, y = 0, z = 0})
-		rotate_bone(player, RARM, {x = 0, y = 0, z = 0})
-		rotate_bone(player, LLEG, {x = 0, y = 0, z = 0})
-		rotate_bone(player, RLEG, {x = 0, y = 0, z = 0})
-	end,
+local ANIMATIONS = {}
+local ORDERED_STATIC_ANIMATIONS = {}
+local ORDERED_MOVING_ANIMATIONS = {}
 
-	[LAY] = function(player, _time)
-		rotate_bone(player, HEAD, {x = 0, y = 0, z = 0})
-		rotate_bone(player, CAPE, {x = 0, y = 0, z = 0})
-		rotate_bone(player, LARM, {x = 0, y = 0, z = 0})
-		rotate_bone(player, RARM, {x = 0, y = 0, z = 0})
-		rotate_bone(player, LLEG, {x = 0, y = 0, z = 0})
-		rotate_bone(player, RLEG, {x = 0, y = 0, z = 0})
-		rotate_bone(player, BODY, BONE_ROTATION.body_lay, BONE_POSITION.body_lay)
-	end,
+local function update_reference_caches()
+	ORDERED_STATIC_ANIMATIONS = {}
+	ORDERED_MOVING_ANIMATIONS = {}
 
-	[SIT] = function(player, _time)
-		rotate_bone(player, LARM, {x = 0,  y = 0, z = 0})
-		rotate_bone(player, RARM, {x = 0,  y = 0, z = 0})
-		rotate_bone(player, LLEG, {x = 90, y = 0, z = 0})
-		rotate_bone(player, RLEG, {x = 90, y = 0, z = 0})
-		rotate_bone(player, BODY, BONE_ROTATION.body_sit, BONE_POSITION.body_sit)
-	end,
+	local ordered_static = {}
+	local ordered_moving = {}
+	for animation, config in pairs(ANIMATIONS) do
+		if config.options.moving then
+			table.insert(ordered_moving, { order=config.options.order or 0, name=animation})
+		else
+			table.insert(ordered_static, { order=config.options.order or 0, name=animation})
+		end
+	end
 
-	[WALK] = function(player, time)
-		local speed = get_animation_speed(player)
-		local sin = math_sin(time * speed * math_pi)
+	table.sort(ordered_static, function (a,b) return a.order < b.order end)
+	for i,animation in ipairs(ordered_static) do
+		table.insert(ORDERED_STATIC_ANIMATIONS, animation.name)
+	end
 
-		rotate_bone(player, CAPE, {x = -35 * sin - 35, y = 0, z = 0})
-		rotate_bone(player, LARM, {x = -55 * sin,      y = 0, z = 0})
-		rotate_bone(player, RARM, {x = 55 * sin,       y = 0, z = 0})
-		rotate_bone(player, LLEG, {x = 55 * sin,       y = 0, z = 0})
-		rotate_bone(player, RLEG, {x = -55 * sin,      y = 0, z = 0})
-	end,
-
-	[MINE] = function(player, time)
-		local speed = get_animation_speed(player)
-
-		local cape_sin = math_sin(time * speed * math_pi)
-		local rarm_sin = math_sin(2 * time * speed * math_pi)
-		local rarm_cos = -math_cos(2 * time * speed * math_pi)
-		local pitch = 90 - get_pitch_deg(player)
-
-		rotate_bone(player, CAPE, {x = -5 * cape_sin - 5,     y = 0,             z = 0})
-		rotate_bone(player, LARM, {x = 0,                     y = 0,             z = 0})
-		rotate_bone(player, RARM, {x = 10 * rarm_sin + pitch, y = 10 * rarm_cos, z = 0})
-		rotate_bone(player, LLEG, {x = 0,                     y = 0,             z = 0})
-		rotate_bone(player, RLEG, {x = 0,                     y = 0,             z = 0})
-	end,
-
-	[WALK_MINE] = function(player, time)
-		local speed = get_animation_speed(player)
-
-		local sin = math_sin(time * speed * math_pi)
-		local rarm_sin = math_sin(2 * time * speed * math_pi)
-		local rarm_cos = -math_cos(2 * time * speed * math_pi)
-		local pitch = 90 - get_pitch_deg(player)
-
-		rotate_bone(player, CAPE, {x = -35 * sin - 35,        y = 0,             z = 0})
-		rotate_bone(player, LARM, {x = -55 * sin,             y = 0,             z = 0})
-		rotate_bone(player, RARM, {x = 10 * rarm_sin + pitch, y = 10 * rarm_cos, z = 0})
-		rotate_bone(player, LLEG, {x = 55 * sin,              y = 0,             z = 0})
-		rotate_bone(player, RLEG, {x = -55 * sin,             y = 0,             z = 0})
-	end,
-}
-
-local function set_animation(player, animation, force_animate)
-	local animation_changed
-			= (players_animation_data:get_previous_animation(player) ~= animation)
-
-	if force_animate or animation_changed then
-		players_animation_data:set_previous_animation(player, animation)
-		ANIMATIONS[animation](player, players_animation_data:get_time(player))
+	table.sort(ordered_moving, function (a,b) return a.order < b.order end)
+	for i,animation in ipairs(ordered_moving) do
+		table.insert(ORDERED_MOVING_ANIMATIONS, animation.name)
 	end
 end
 
-local function rotate_head(player)
-	local head_x_rotation = -get_pitch_deg(player)
-	rotate_bone(player, HEAD, {x = head_x_rotation, y = 0, z = 0})
+function playeranim.register_animation(name, options, apply)
+	if type(options) ~= 'table' then options = {} end
+	ANIMATIONS[name] = {
+		apply=apply,
+		options = options
+	}
+	update_reference_caches()
+end
+playeranim.bones = {
+	BODY = BODY,
+	HEAD = HEAD,
+	CAPE = CAPE,
+	LARM = LARM,
+	RARM = RARM,
+	LLEG = LLEG,
+	RLEG = RLEG
+}
+function playeranim.assign_animation (player, animation)
+	 return players_animation_data:assign_animation(player, animation)
+end
+function playeranim.unassign_animation (player, animation)
+	 return players_animation_data:unassign_animation(player, animation)
+end
+function playeranim.set_animation_speed(player, speed)
+	 return players_animation_data:set_animation_speed(player, speed)
+end
+function playeranim.set_rotate_on_sneak(newval)
+	ROTATE_ON_SNEAK = newval
 end
 
-local table_remove, math_deg = table.remove, math.deg
-local function rotate_body_and_head(player)
+playeranim.register_animation("stand", {looking=true,facing=true})
+
+playeranim.register_animation("lay", nil, function(player, _time)
+	anim.rotations[BODY] = vector.add(anim.rotations[BODY], anim.rotations.body_lay)
+	anim.positions[BODY] = vector.add(anim.positions[BODY], anim.positions.body_lay)
+end)
+
+playeranim.register_animation("sit", {looking=true}, function(player, _time, anim)
+	anim.rotations[LLEG].x = anim.rotations[LLEG].x+90
+	anim.rotations[RLEG].x = anim.rotations[RLEG].x+90
+	anim.rotations[BODY] = vector.add(anim.rotations[BODY], anim.rotations.body_sit)
+	anim.positions[BODY] = vector.add(anim.positions[BODY], anim.positions.body_sit)
+end)
+
+playeranim.register_animation("walk", {moving=true,looking=true,facing=true}, function(player, time, anim)
+
+	local sin = math_sin(time * anim.speed * math_pi)
+
+	anim.rotations[CAPE].x = anim.rotations[CAPE].x+(-35 * sin - 35)
+	anim.rotations[LARM].x = anim.rotations[LARM].x+(-55 * sin)
+	anim.rotations[LLEG].x = anim.rotations[LLEG].x+( 55 * sin)
+	anim.rotations[RLEG].x = anim.rotations[RLEG].x+(-55 * sin)
+
+	if not anim.current_animations.mine then
+		anim.rotations[RARM].x = anim.rotations[RARM].x+(55 * sin)
+	end
+end)
+
+playeranim.register_animation("mine", {moving=true}, function(player, time, anim)
+
+	local cape_sin = math_sin(time * anim.speed * math_pi)
+	local rarm_sin = math_sin(2 * time * anim.speed * math_pi)
+	local rarm_cos = -math_cos(2 * time * anim.speed * math_pi)
+	local pitch = 90 - get_pitch_deg(player)
+
+	anim.rotations[CAPE].x = anim.rotations[CAPE].x+(-5  * cape_sin - 5)
+	anim.rotations[RARM].x = anim.rotations[RARM].x+( 10 * rarm_sin + pitch)
+	anim.rotations[RARM].y = anim.rotations[RARM].y+( 10 * rarm_cos)
+end)
+
+local function rotate_head(player, anim)
+	local head_x_rotation = -get_pitch_deg(player)
+	anim.rotations[HEAD].x = anim.rotations[HEAD].x+head_x_rotation
+end
+
+local function rotate_body(player, anim)
 	local body_x_rotation = (function()
 		local sneak = player:get_player_control().sneak
-		return sneak and BODY_X_ROTATION_SNEAK or 0
+		return sneak and ROTATE_ON_SNEAK and BODY_X_ROTATION_SNEAK or 0
 	end)()
 
 	local body_y_rotation = (function()
@@ -273,12 +318,44 @@ local function rotate_body_and_head(player)
 		return 0
 	end)()
 
-	rotate_bone(player, BODY, {x = body_x_rotation, y = body_y_rotation, z = 0})
-
-	local head_x_rotation = -get_pitch_deg(player)
-	rotate_bone(player, HEAD, {x = head_x_rotation, y = -body_y_rotation, z = 0})
+	anim.rotations[BODY].x = anim.rotations[BODY].x+body_x_rotation
+	anim.rotations[BODY].y = anim.rotations[BODY].y+body_y_rotation
+	anim.rotations[HEAD].y = anim.rotations[HEAD].y-body_y_rotation
 end
 
+local function get_animation_speed(player)
+	local assigned_speed = players_animation_data:get_animation_speed(player)
+	if assigned_speed then
+		return assigned_speed
+	end
+	if player:get_player_control().sneak then
+		return ANIMATION_SPEED_SNEAK
+	end
+	return ANIMATION_SPEED
+end
+
+local function static_animations_changed(previous_animations, current_animations)
+	for animation in pairs(previous_animations) do
+		if not ANIMATIONS[animation].options.moving and not current_animations[animation] then
+			return true
+		end
+	end
+	for animation in pairs(current_animations) do
+		if not ANIMATIONS[animation].options.moving and not previous_animations[animation] then
+			return true
+		end
+	end
+	return false
+end
+
+local function any_animation_has_property(animations, property)
+	for animation in pairs(animations) do
+		if ANIMATIONS[animation] and ANIMATIONS[animation].options[property] then
+			return true
+		end
+	end
+	return false
+end
 
 local function animate_player(player, dtime)
 	local data = get_animation(player)
@@ -291,44 +368,116 @@ local function animate_player(player, dtime)
 
 	local animation = data.animation
 
-	-- Yaw history
-	if animation == "lay" or animation == "sit" then
-		players_animation_data:clear_yaw_history(player)
+	-- Combine manually set animations and system defined animations
+	local animations = table.copy(players_animation_data:get_assigned_animations(player))
+	if animation == "walk_mine" then
+		animations.walk = true
+		animations.mine = true
 	else
-		players_animation_data:add_yaw_to_history(player)
+		animations[animation] = true
 	end
 
+	-- Set animation
+
+	local animation_speed = get_animation_speed(player)
+
+	local moving_animation = any_animation_has_property(animations, 'moving')
+	local facing_animation = any_animation_has_property(animations, 'facing')
+	local looking_animation = any_animation_has_property(animations, 'looking')
+
 	-- Increment animation time
-	if animation == "walk"
-	or animation == "mine"
-	or animation == "walk_mine" then
+	if moving_animation then
 		players_animation_data:increment_time(player, dtime)
 	else
 		players_animation_data:reset_time(player)
 	end
 
-	-- Set animation
-	if animation == "stand" then
-		set_animation(player, STAND)
-	elseif animation == "lay" then
-		set_animation(player, LAY)
-	elseif animation == "sit" then
-		set_animation(player, SIT)
-	elseif animation == "walk" then
-		set_animation(player, WALK, true)
-	elseif animation == "mine" then
-		set_animation(player, MINE, true)
-	elseif animation == "walk_mine" then
-		set_animation(player, WALK_MINE, true)
+	-- Yaw history
+	if facing_animation then
+		players_animation_data:add_yaw_to_history(player)
+	else
+		players_animation_data:clear_yaw_history(player)
 	end
 
-	-- Rotate body and head
-	if animation == "lay" then
-		-- Do nothing
-	elseif animation == "sit" then
-		rotate_head(player)
+	local previous_animations = players_animation_data:get_previous_animations(player)
+	local changes = false
+
+	local time = players_animation_data:get_time(player)
+
+	-- Apply any static animations to the base if they have changed, retrieve them if not
+	local rotations
+	local positions
+	if static_animations_changed(previous_animations, animations) then
+		rotations = table.copy(BONE_ROTATION.default)
+		positions = table.copy(BONE_POSITION.default)
+		for _,animation in ipairs(ORDERED_STATIC_ANIMATIONS) do
+			if animations[animation] then
+				local apply = ANIMATIONS[animation] and ANIMATIONS[animation].apply
+				if apply then
+					apply(player, time, {
+						rotations = rotations,
+						positions = positions,
+						current_animations = animations,
+						previous_animations = previous_animations,
+						speed = animation_speed
+					})
+				end
+			end
+		end
+		players_animation_data:set_static_rotations(player, table.copy(rotations))
+		players_animation_data:set_static_positions(player, table.copy(positions))
+		changes = true
 	else
-		rotate_body_and_head(player)
+		rotations = table.copy(players_animation_data:get_static_rotations(player))
+		positions = table.copy(players_animation_data:get_static_positions(player))
+	end
+
+	-- Apply any animations that are moving
+	for _,animation in ipairs(ORDERED_MOVING_ANIMATIONS) do
+		if animations[animation] then
+			if not previous_animations[animation] then
+				changes = true
+			end
+			local apply = ANIMATIONS[animation] and ANIMATIONS[animation].apply
+			if apply then
+				apply(player, time, {
+					rotations = rotations,
+					positions = positions,
+					current_animations = animations,
+					previous_animations = previous_animations,
+					speed = animation_speed
+				})
+			end
+		end
+	end
+
+	-- Head looks around
+	if looking_animation then
+		rotate_head(player, {
+			rotations = rotations,
+			positions = positions,
+			current_animations = animations,
+			previous_animations = previous_animations,
+			speed = animation_speed
+		})
+	end
+
+	-- Body follows head
+	if facing_animation then
+		rotate_body(player, {
+			rotations = rotations,
+			positions = positions,
+			current_animations = animations,
+			previous_animations = previous_animations,
+			speed = animation_speed
+		})
+	end
+
+	for name, bone in pairs(playeranim.bones) do
+		rotate_bone(player, bone, rotations[bone], positions[bone])
+	end
+	if changes then
+		players_animation_data:set_previous_animations(player, animations)
 	end
 end
 
